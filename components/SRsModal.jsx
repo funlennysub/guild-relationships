@@ -8,7 +8,6 @@ const { useState, useEffect } = React
 
 module.exports = ({ }) => {
 
-
   const [friendsCategoryOpened, openFriends] = useState(false)
   const [blockedCategoryOpened, openBlocked] = useState(false)
   const [friends, setFriends] = useState([])
