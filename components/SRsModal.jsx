@@ -1,96 +1,79 @@
-const { getModuleByDisplayName, React, getModule } = require('powercord/webpack');
-const { Category } = require('powercord/components/settings');
-const { AsyncComponent } = require('powercord/components');
-const FormTitle = AsyncComponent.from(getModuleByDisplayName('FormTitle'));
-const { Modal } = require('powercord/components/modal');
+const { React, Flux, getModule } = require('powercord/webpack');
+const { FormTitle, settings: { Category }, modal: { Modal } } = require('powercord/components');
 
-const { useState, useEffect } = React
+class SRsModal extends React.PureComponent {
+  constructor (props) {
+    super(props);
 
-module.exports = ({ }) => {
+    this.state = {
+      friends: false,
+      blocked: false
+    };
+  }
 
-  const [friendsCategoryOpened, openFriends] = useState(false)
-  const [blockedCategoryOpened, openBlocked] = useState(false)
-  const [friends, setFriends] = useState([])
-  const [blockedUsers, setBlocked] = useState([])
-
-  useEffect(() => {
-    async function funcName() {
-
-      const getUser = (await getModule(["getUser", "setFlag"])).getUser
-      const getMemberIds = (await getModule(["getMemberIds"])).getMemberIds
-      const isFriend = (await getModule(["isFriend"])).isFriend
-      const isBlocked = (await getModule(["isFriend", "isBlocked"])).isBlocked
-
-      const guild = getModule(['getGuildId'], false).getGuildId();
-
-      let friendUsernames = []
-					getMemberIds(guild).forEach(id => {
-						if (isFriend(id)) {
-							friendUsernames.push(
-								getUser(id).then((user) => {
-                 return { friendID: `${user.id}`, friendUsername: `${user.username}#${user.discriminator}`, userAvatarURL: `${user.avatarURL}` }
-                })
-							)
-						}
-          });
-        friendUsernames = await Promise.all(friendUsernames)
-
-        const friend_arr = [];
-        for (const friend of friendUsernames) {
-          friend_arr.push(<div className="user-slDf"><div style={{backgroundImage: `url('${friend.userAvatarURL}')`}} className="userPfp"></div><span className="usename-jdkd">{friend.friendUsername}</span></div>);
-        }
-        setFriends(friend_arr)
-
-        let blockedUsernames = []
-					getMemberIds(guild).forEach(id => {
-						if (isBlocked(id)) {
-							blockedUsernames.push(
-								getUser(id).then((b_user) => {
-                  return { blockedID: `${b_user.id}`, blockedUsername: `${b_user.username}#${b_user.discriminator}`, userAvatarURL: `${b_user.avatarURL}` }
-                })
-							)
-						}
-          });    
-
-        blockedUsernames = await Promise.all(blockedUsernames)
-
-        const blocked_arr = [];
-        for (const blocked of blockedUsernames) {
-          blocked_arr.push(<div className="user-slDf"><div style={{backgroundImage: `url('${blocked.userAvatarURL}')`}} className="userPfp"></div><span className="usename-jdkd">{blocked.blockedUsername}</span></div>);
-        }
-        setBlocked(blocked_arr);
-    }
-    funcName()
-  }, [])
-
-
+  render () {
     return (
-      <Modal className='guild-relationships-modal'>
+      <Modal className='guild-relationships-modal powercord-text'>
         <Modal.Header>
           <FormTitle tag='h4'>Guild Relationships</FormTitle>
         </Modal.Header>
         <Modal.Content>
-          <Category
-          name="Friends"
-          opened={friendsCategoryOpened}
-          onChange={() => openFriends(!friendsCategoryOpened)}
-          >
-            <ul className="powercord-text">
-              {friends}
-            </ul>
-          </Category>
-          <Category
-          name="Blocked"
-          opened={blockedCategoryOpened}
-          onChange={() => openBlocked(!blockedCategoryOpened)}
-          >
-            <ul className="powercord-text">
-              {blockedUsers}
-            </ul>
-          </Category>
+          {[ 'friends', 'blocked' ].map(type =>
+            this.props[type].length === 0
+              ? <div className='grs-none'>There are no {type} in this server.</div>
+              : (
+                <Category
+                  key={type}
+                  name={type[0].toUpperCase() + type.slice(1)}
+                  opened={this.state[type]}
+                  onChange={() => this.setState({ [type]: !this.state[type] })}
+                >
+                  {this.props[type].map(user => (
+                    <div
+                      key={user.id}
+                      className='grs-user'
+                      onClick={() => getModule([ 'open', 'fetchProfile' ], false).open(user.id)}
+                    >
+                      <img src={user.avatarURL} alt={`${user.username}'s avatar`}/>
+                      <span>{user.tag}</span>
+                    </div>
+                  ))}
+                </Category>
+              ))}
         </Modal.Content>
       </Modal>
-    )
-
-
+    );
+  }
 }
+
+module.exports = Flux.connectStoresAsync(
+  [ getModule([ 'getRelationships' ]), getModule([ 'getCurrentUser' ]), getModule([ 'isMember' ]) ],
+  ([ relationshipsStore, userStore, membersStore ], compProps) => {
+    // Its safe to assume if the module aboves were found that this one is also loaded
+    const userFetcher = getModule([ 'getUser' ], false);
+    const relationships = relationshipsStore.getRelationships();
+    const props = {
+      friends: [],
+      blocked: []
+    };
+
+    for (const userId in relationships) {
+      if (!membersStore.isMember(compProps.guildId, userId)) {
+        continue;
+      }
+
+      const relationshipType = relationships[userId];
+      const user = userStore.getUser(userId);
+      if (!user) {
+        userFetcher.getUser(userId);
+        continue;
+      }
+      if (relationshipType === 1) {
+        props.friends.push(user);
+      } else if (relationshipType === 2) {
+        props.blocked.push(user);
+      }
+    }
+    return props;
+  }
+)(SRsModal);
