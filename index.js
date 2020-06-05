@@ -9,7 +9,7 @@ const Modal = require('./components/SRsModal.jsx');
 module.exports = class RelationShips extends Plugin {
   async startPlugin () {
     this._injectContextMenu();
-    this.loadCSS(resolve(__dirname, 'style.css'));
+    this.loadStylesheet('./style.css');
   }
 
   async _injectContextMenu () {
