@@ -6,7 +6,7 @@ class SRsModal extends React.PureComponent {
     super(props);
 
     this.state = {
-      friends: false,
+      friends: true,
       blocked: false
     };
   }
